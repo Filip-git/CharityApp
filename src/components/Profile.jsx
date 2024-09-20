@@ -6,9 +6,10 @@ import { onAuthStateChanged } from "firebase/auth";
 function Profile() {
   const [userData, setUserData] = useState(null);
   const [donations, setDonations] = useState([]);
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [newName, setNewName] = useState("");
-  const [donationGoal, setDonationGoal] = useState(1000); // Example goal
+  const [donationGoal, setDonationGoal] = useState(0);
   const [totalDonations, setTotalDonations] = useState(0);
 
   useEffect(() => {
@@ -17,18 +18,35 @@ function Profile() {
         if (user) {
           // Fetch user data
           const userDoc = await getDoc(doc(db, "users", user.uid));
-          setUserData(userDoc.data());
-          setNewName(userDoc.data().name);
+          if (userDoc.exists()) {
+            setUserData(userDoc.data());
+            setNewName(userDoc.data().name);
+            setDonationGoal(userDoc.data().donationGoal || 0);
 
-          // Fetch user donations
-          const q = query(collection(db, "donations"), where("userId", "==", user.uid));
-          const donationDocs = await getDocs(q);
-          const userDonations = donationDocs.docs.map((doc) => doc.data());
-          setDonations(userDonations);
+            // Fetch user donations
+            const q = query(collection(db, "donations"), where("userId", "==", user.uid));
+            const donationDocs = await getDocs(q);
+            
+            // Map donations to include charity names
+            const userDonations = await Promise.all(
+              donationDocs.docs.map(async (donationDoc) => {
+                const donationData = donationDoc.data();
+                const charityDoc = await getDoc(doc(db, "charities", donationData.charityId));
+                return {
+                  ...donationData,
+                  charityName: charityDoc.exists() ? charityDoc.data().name : "Unknown Charity",
+                };
+              })
+            );
 
-          // Sum user donations
-          const total = userDonations.reduce((acc, curr) => acc + curr.amount, 0);
-          setTotalDonations(total);
+            setDonations(userDonations);
+
+            // Sum user donations
+            const total = userDonations.reduce((acc, curr) => acc + curr.amount, 0);
+            setTotalDonations(total);
+          } else {
+            console.error("User document does not exist");
+          }
         }
       });
     };
@@ -38,78 +56,121 @@ function Profile() {
 
   const handleUpdateProfile = async () => {
     const userRef = doc(db, "users", auth.currentUser.uid);
-    await updateDoc(userRef, { name: newName });
-    setIsEditing(false);
+    await updateDoc(userRef, { name: newName, donationGoal });
+
+    // Update the username in all donations
+    const donationQuery = query(collection(db, "donations"), where("userId", "==", auth.currentUser.uid));
+    const donationDocs = await getDocs(donationQuery);
+    donationDocs.forEach(async (doc) => {
+      await updateDoc(doc.ref, { username: newName });
+    });
+
+    setIsEditingName(false);
+    setIsEditingGoal(false);
   };
 
   const donationProgress = (totalDonations / donationGoal) * 100;
+  const percentage = (totalDonations / donationGoal) * 100;
+  const goalReached = percentage >= 100;
 
   if (!userData) {
     return <p>Loading...</p>;
   }
 
-  const progress = 0;
-
   return (
     <div className="max-w-4xl mx-auto py-10 px-4">
       <h1 className="text-3xl font-bold mb-6">Profile</h1>
-      <div className="bg-white shadow-md p-6 rounded-lg">
-        {isEditing ? (
-          <>
-            <input
-              type="text"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              className="border p-2 mb-4"
-            />
-            <button
-              onClick={handleUpdateProfile}
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-            >
-              Save
-            </button>
-          </>
-        ) : (
-          <>
-            <h2 className="text-2xl font-semibold mb-2">Name: {userData.name}</h2>
-            <button
-              onClick={() => setIsEditing(true)}
-              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-            >
-              Edit Name
-            </button>
-          </>
-        )}
-        <p className="text-gray-700 mb-2">Email: {userData.email}</p>
-        <p className="text-gray-700 mb-2">Role: {userData.role}</p>
-      </div>
-      <div className="mt-8">
-        <h3 className="text-xl font-bold">Donations</h3>
-        <p className="text-gray-600 mb-4">Total Donations: ${totalDonations}</p>
-        <div className="w-full bg-gray-200 rounded-full h-4 mb-4">
-          <div
-            className="bg-green-500 h-4 rounded-full"
-            style={{ width: `${donationProgress}%` }}
-          ></div>
+      
+      <div className="bg-white shadow-md p-6 rounded-lg mb-8">
+        {/* Name Section */}
+        <div className="mb-6">
+          {isEditingName ? (
+            <>
+              <input
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                className="border p-2 mb-4 w-full rounded"
+              />
+              <button
+                onClick={handleUpdateProfile}
+                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition"
+              >
+                Save Name
+              </button>
+            </>
+          ) : (
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Name: {userData.name}</h2>
+              <button
+                onClick={() => setIsEditingName(true)}
+                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
+              >
+                Edit
+              </button>
+            </div>
+          )}
         </div>
-        <p className="text-gray-700 mb-2">Donation Goal: ${donationGoal}</p>
-        <div className="w-full bg-gray-200 rounded-full h-4 dark:bg-gray-700">
-  <div
-    className="bg-blue-600 h-4 rounded-full text-center text-xs font-medium leading-none text-white"
-    style={{ width: `${progress}%` }}
-  >
-    {progress}%
+
+        {/* Donation Goal Section */}
+        <div className="mb-6">
+          {isEditingGoal ? (
+            <>
+              <input
+                type="number"
+                value={donationGoal}
+                onChange={(e) => setDonationGoal(Number(e.target.value))}
+                className="border p-2 mb-4 w-full rounded"
+                placeholder="Set your donation goal"
+              />
+              <button
+                onClick={handleUpdateProfile}
+                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition"
+              >
+                Save Goal
+              </button>
+            </>
+          ) : (
+            <div className="flex justify-between items-center">
+              <p className="text-lg">Donation Goal: ${donationGoal}</p>
+              <button
+                onClick={() => setIsEditingGoal(true)}
+                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
+              >
+                Edit Goal
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Email Section */}
+        <p className="text-gray-700 mb-6 text-lg">Email: {userData.email}</p>
+      </div>
+
+      {/* Progress Bar Section */}
+<div className="mb-8">
+  <h3 className="text-lg font-semibold">Total Donations: ${totalDonations} / ${donationGoal}</h3>
+  <div className="w-full bg-gray-200 rounded-full h-8 overflow-hidden"> {/* Increased height */}
+    <div
+      className="bg-green-500 h-full text-center text-sm text-white leading-none" 
+      style={{ width: `${donationProgress > 100 ? 100 : donationProgress}%` }}
+    >
+      {goalReached ? "Goal Achieved!" : `${Math.round(percentage)}% towards goal`}
+    </div>
   </div>
 </div>
 
-
+      {/* Donation List */}
+      <div className="mt-8">
+        <h3 className="text-xl font-bold">Donations</h3>
         {donations.length > 0 ? (
-          <ul className="mt-4">
+          <ul className="mt-4 space-y-4">
             {donations.map((donation, index) => (
-              <li key={index} className="bg-gray-100 p-4 rounded-lg mb-2">
-                <p>Amount: {donation.amount}</p>
-                <p>Date: {new Date(donation.date).toLocaleDateString()}</p>
-                <p>Charity: {donation.charityName}</p>
+              <li key={index} className="bg-gray-100 p-4 rounded-lg shadow-md">
+                <p className="font-semibold">Charity: {donation.charityName}</p>
+                <p>Amount: ${donation.amount}</p>
+                <p>Date: {new Date(donation.date.seconds * 1000).toLocaleDateString()}</p>
+                <p>Anonymous: {donation.anonymous ? "Yes" : "No"}</p>
               </li>
             ))}
           </ul>

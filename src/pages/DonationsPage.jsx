@@ -1,9 +1,10 @@
-import Donations from "../components/Donations"
+import UserDonations from '../components/UserDonations'
 
 const DonationsPage = () => {
   return (
-    <Donations />
-  )
+
+    <UserDonations />
+    )
 }
 
 export default DonationsPage

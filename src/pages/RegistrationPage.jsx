@@ -21,6 +21,7 @@ function RegisterPage() {
       
         await setDoc(doc(db, "users", user.uid), {
           name: username,
+          displayName: username,
           email: user.email,
           role: "user",
           userId: user.uid,

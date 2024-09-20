@@ -13,6 +13,7 @@ import RegisterPage from "./Pages/RegistrationPage";
 import { Toaster } from "react-hot-toast";
 import Sidebar from "./components/Sidebar";
 import Layout from "./components/Layout";
+import CharityDetails from "./components/CharityDetails";
 
 function App() {
   return (
@@ -26,7 +27,7 @@ function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/charities" element={<CharityListPage />} />
-            <Route path="/charity/:id" element={<CharityDetailsPage />} />
+            <Route path="/charity/:id" element={<CharityDetails />} />
             <Route path="/donations" element={<DonationsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
