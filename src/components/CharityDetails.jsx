@@ -41,20 +41,20 @@ const CharityDetails = () => {
   }, [id]);
 
   const handleDonationUpdate = (donationData) => {
-    setCharity((prev) => ({
-      ...prev,
-      donated: prev.donated + donationData.amount,
-    }));
-    setDonations((prev) => [
-      ...prev,
-      {
-        userId: donationData.userId,
-        amount: donationData.amount,
-        date: new Date(),
-        anonymous: donationData.anonymous,
-        username: donationData.username, // Make sure to include the username
-      },
-    ]);
+    // setCharity((prev) => ({
+    //   ...prev,
+    //   donated: prev.donated + donationData.amount,
+    // }));
+    // setDonations((prev) => [
+    //   ...prev,
+    //   {
+    //     userId: donationData.userId,
+    //     amount: donationData.amount,
+    //     date: new Date(),
+    //     anonymous: donationData.anonymous,
+    //     username: donationData.username, // Make sure to include the username
+    //   },
+    // ]);
   };
   
 
