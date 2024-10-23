@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { doc, getDoc, updateDoc, arrayUnion, onSnapshot } from "firebase/firestore";
+import { doc, updateDoc, arrayUnion, onSnapshot } from "firebase/firestore";
 import { db, auth } from "../firebaseConfig";
 import CharityProgressBar from "./CharityProgressBar";
 import AddDonation from "./AddDonation";
@@ -40,7 +40,7 @@ const CharityDetails = () => {
     return () => unsubscribe(); // Cleanup on unmount
   }, [id]);
 
-  const handleDonationUpdate = (donationData) => {
+ // const handleDonationUpdate = (donationData) => {
     // setCharity((prev) => ({
     //   ...prev,
     //   donated: prev.donated + donationData.amount,
@@ -55,7 +55,7 @@ const CharityDetails = () => {
     //     username: donationData.username, // Make sure to include the username
     //   },
     // ]);
-  };
+ // };
   
 
   if (loading) return <p>Loading charity details...</p>;
@@ -63,50 +63,56 @@ const CharityDetails = () => {
 
   
 
-  const handleDonation = async (donationAmount, isAnonymous) => {
-    if (!auth.currentUser) {
-      toast.error("Please log in to donate.");
-      return;
-    }
+const handleDonation = async (donationAmount, isAnonymous) => {
+  if (!auth.currentUser) {
+    toast.error("Please log in to donate.");
+    return;
+  }
 
-    try {
-      const charityRef = doc(db, "charities", id);
-      const user = auth.currentUser;
+  try {
+    const charityRef = doc(db, "charities", id);
+    const user = auth.currentUser;
 
-      // Update charity's donations and total donation amount
-      await updateDoc(charityRef, {
-        donated: charity.donated + donationAmount,
-        donations: arrayUnion({
-          userId: user.uid,
-          amount: donationAmount,
-          date: new Date(),
-          anonymous: isAnonymous,
-        }),
-      });
+    // Fetch the user's profile to get the username
+    const userProfile = await getUserProfile(user.uid); // Assuming you have a function to get this
 
-      // Update local state for charity and donations
-      setCharity((prev) => ({
-        ...prev,
-        donated: prev.donated + donationAmount,
-      }));
-      setDonations((prev) => [
-        ...prev,
-        {
-          userId: user.uid,
-          amount: donationAmount,
-          date: new Date(),
-          anonymous: isAnonymous,
-        },
-      ]);
+    // Update charity's donations and total donation amount
+    await updateDoc(charityRef, {
+      donated: charity.donated + donationAmount,
+      donations: arrayUnion({
+        userId: user.uid,
+        amount: donationAmount,
+        date: new Date(),
+        anonymous: isAnonymous,
+        username: isAnonymous ? null : userProfile.username, // Save username only if not anonymous
+      }),
+    });
 
-      toast.success("Donation successful!");
-    } catch (error) {
-      toast.error("Failed to update donations.");
-    }
-  };
+    setCharity((prev) => ({
+      ...prev,
+      donated: prev.donated + donationAmount,
+    }));
+
+    setDonations((prev) => [
+      ...prev,
+      {
+        userId: user.uid,
+        amount: donationAmount,
+        date: new Date(),
+        anonymous: isAnonymous,
+        username: isAnonymous ? 'Anonymous' : userProfile.username, // Show anonymous or username
+      },
+    ]);
+
+    toast.success("Donation successful!");
+  } catch (error) {
+    toast.error("Failed to update donations.");
+  }
+};
+
 
   if (loading) return <p>Loading charity details...</p>;
-  if (!charity) return <p>No charity found.</p>;
+  if (!charity) return <p>No charity found.</p>; 
 
   return (
     <div className="max-w-4xl mx-auto py-10 px-4">
